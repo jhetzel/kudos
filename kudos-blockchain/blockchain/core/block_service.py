@@ -1,93 +1,115 @@
 import psycopg2
 from psycopg2.extras import DictCursor
 from datetime import datetime
-import time
 import logging
+import json
 
 
 class BlockService:
     def __init__(self, db_url):
-        self.db_url = db_url
-        logging.info(f"200 OK - Verwende DB_URL: {self.db_url}")
-        self._create_table()
-
-    def _create_table(self):
-        retries = 5
-        while retries > 0:
-            try:
-                with psycopg2.connect(self.db_url) as conn:
-                    with conn.cursor() as cursor:
-                        cursor.execute("""
-                        CREATE TABLE IF NOT EXISTS blockchain (
-                            id SERIAL PRIMARY KEY,
-                            index INTEGER NOT NULL,
-                            timestamp TIMESTAMP NOT NULL,
-                            data TEXT NOT NULL,
-                            previous_hash TEXT NOT NULL,
-                            hash TEXT NOT NULL,
-                            sender TEXT NOT NULL,
-                            thread TEXT NOT NULL,
-                            subject TEXT NOT NULL,
-                            message TEXT NOT NULL
-                        );
-                        """)
-                        conn.commit()
-                        logging.info("200 OK - Tabelle 'blockchain' erfolgreich erstellt oder bereits vorhanden.")
-                        return
-            except psycopg2.OperationalError as e:
-                retries -= 1
-                logging.warning(
-                    f"503 Service Unavailable - Datenbankverbindung fehlgeschlagen: {e}. "
-                    f"Erneuter Versuch in 5 Sekunden... ({retries} verbleibend)"
-                )
-                time.sleep(5)
-        logging.error("500 Internal Server Error - Datenbank konnte nach mehreren Versuchen nicht erreicht werden.")
-        raise Exception("Datenbank konnte nach mehreren Versuchen nicht erreicht werden.")
-
-    def save_block(self, block):
-        query = """
-        INSERT INTO blockchain (index, timestamp, data, previous_hash, hash, sender, thread, subject, message)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        Initialisiert den BlockService mit einer Datenbankverbindung.
+        :param db_url: Die URL zur Datenbankverbindung
         """
         try:
-            with psycopg2.connect(self.db_url) as conn:
-                with conn.cursor() as cursor:
-                    logging.info(f"DEBUG: Speichere Block {block.index} in der Datenbank...")
-                    timestamp = (
-                        block.timestamp
-                        if isinstance(block.timestamp, datetime)
-                        else datetime.fromtimestamp(block.timestamp)
+            self.connection = psycopg2.connect(db_url, cursor_factory=DictCursor)
+            self._initialize_database()
+            logging.info("200 OK - Datenbankverbindung erfolgreich hergestellt.")
+        except psycopg2.OperationalError as e:
+            logging.error(f"500 Internal Server Error - Fehler beim Herstellen der DB-Verbindung: {e}")
+            raise
+        except Exception as e:
+            logging.error(f"500 Internal Server Error - Unerwarteter Fehler: {e}")
+            raise
+
+    def _initialize_database(self):
+        """
+        Erstellt die notwendige Tabelle, falls sie nicht existiert.
+        """
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS blockchain (
+                        index SERIAL PRIMARY KEY,
+                        timestamp TIMESTAMPTZ NOT NULL,
+                        data JSONB NOT NULL,
+                        previous_hash TEXT NOT NULL,
+                        sender TEXT NOT NULL,
+                        thread TEXT NOT NULL,
+                        subject TEXT NOT NULL,
+                        message TEXT NOT NULL,
+                        hash TEXT NOT NULL
                     )
-                    cursor.execute(
-                        query,
-                        (
-                            block.index,
-                            timestamp,
-                            block.data,
-                            block.previous_hash,
-                            block.hash,
-                            block.sender,
-                            block.thread,
-                            block.subject,
-                            block.message,
-                        ),
-                    )
-                    conn.commit()
-                    logging.info(f"201 Created - Block {block.index} erfolgreich in der Datenbank gespeichert.")
-        except psycopg2.Error as e:
+                """)
+                self.connection.commit()
+                logging.info("200 OK - Tabelle 'blockchain' erfolgreich erstellt oder bereits vorhanden.")
+        except Exception as e:
+            logging.error(f"500 Internal Server Error - Fehler beim Initialisieren der Tabelle: {e}")
+            raise
+
+    def save_block(self, block):
+        """
+        Speichert einen Block in der Datenbank.
+        """
+        try:
+            with self.connection.cursor() as cursor:
+                data_json = json.dumps(block.data)
+                cursor.execute(
+                    """
+                    INSERT INTO blockchain (index, timestamp, data, previous_hash, sender, thread, subject, message, hash)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        block.index,
+                        block.timestamp.isoformat(),
+                        data_json,
+                        block.previous_hash,
+                        block.sender,
+                        block.thread,
+                        block.subject,
+                        block.message,
+                        block.hash,
+                    ),
+                )
+                self.connection.commit()
+                logging.info(f"201 Created - Block {block.index} erfolgreich in der Datenbank gespeichert.")
+        except psycopg2.DatabaseError as e:
             logging.error(f"500 Internal Server Error - Fehler beim Speichern des Blocks {block.index}: {e}")
+            self.connection.rollback()
+            raise
+        except Exception as e:
+            logging.error(f"500 Internal Server Error - Unerwarteter Fehler: {e}")
             raise
 
     def load_chain(self):
-        """Lädt die gesamte Blockchain aus der Datenbank."""
-        query = "SELECT * FROM blockchain ORDER BY index ASC"
+        """
+        Lädt die gesamte Blockchain aus der Datenbank.
+        """
         try:
-            with psycopg2.connect(self.db_url, cursor_factory=DictCursor) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(query)
-                    chain = cursor.fetchall()
-                    logging.info(f"200 OK - Blockchain mit {len(chain)} Blöcken erfolgreich geladen.")
-                    return chain
-        except psycopg2.Error as e:
+            with self.connection.cursor() as cursor:
+                cursor.execute("SELECT * FROM blockchain ORDER BY index ASC")
+                rows = cursor.fetchall()
+
+                chain = []
+                for row in rows:
+                    chain.append({
+                        "index": row["index"],
+                        "timestamp": datetime.fromisoformat(row["timestamp"])
+                        if isinstance(row["timestamp"], str) else row["timestamp"],
+                        "data": row["data"],
+                        "previous_hash": row["previous_hash"],
+                        "sender": row["sender"],
+                        "thread": row["thread"],
+                        "subject": row["subject"],
+                        "message": row["message"],
+                        "hash": row["hash"],
+                    })
+
+                logging.info(f"200 OK - Blockchain mit {len(chain)} Blöcken geladen.")
+                return chain
+        except psycopg2.DatabaseError as e:
             logging.error(f"500 Internal Server Error - Fehler beim Laden der Blockchain: {e}")
+            raise
+        except Exception as e:
+            logging.error(f"500 Internal Server Error - Unerwarteter Fehler: {e}")
             raise

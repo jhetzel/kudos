@@ -1,3 +1,7 @@
 import sys
 print(sys.path)
-__all__ = ["Blockchain"]
+from .blockchain.core.blockchain import Blockchain
+from .blockchain.core.block_service import BlockService
+from .blockchain.core.block_validation_service import ValidationService
+
+__all__ = ["Blockchain", "BlockService", "ValidationService"]

@@ -2,6 +2,7 @@ from blockchain.core.blockchain import Blockchain
 import os
 import logging
 
+
 def get_db_url():
     is_docker = os.path.exists('/.dockerenv')
     host = "kudos-db" if is_docker else "localhost"
@@ -12,7 +13,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.StreamHandler(),  # Logs werden an die Standardausgabe weitergeleitet
+        logging.StreamHandler(),
     ],
 )
 
@@ -20,19 +21,23 @@ DB_URL = get_db_url()
 
 def test_persistence():
     try:
-        # Initialisiere die Blockchain
         logging.info("200 OK - Initialisiere Blockchain mit DB_URL.")
         blockchain = Blockchain(DB_URL)
 
         # Füge einen neuen Block hinzu
         try:
             new_block = blockchain.add_block(
-                data="Test block",
-                sender="test_sender_hash",
-                thread="test_thread",
-                subject="Test Subject",
-                message="This is a test message.",
+                data=[{"amount": 10, "sender": "user1", "receiver": "user2"}],
+                sender="user1",
+                thread="thread1",
+                subject="subject1",
+                message="message1",
             )
+
+            if new_block is None:
+                logging.error("400 Bad Request - Kein Block erstellt, da keine gültigen Transaktionen gefunden wurden.")
+                return
+
             logging.info(
                 f"201 Created - Block hinzugefügt: Index={new_block.index}, Hash={new_block.hash}"
             )

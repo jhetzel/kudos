@@ -1,4 +1,3 @@
-import sys
-print(sys.path)
+from .proof_of_kudos import ProofOfKudos
 
-from .core.blockchain import Blockchain
+__all__ = ["ProofOfKudos"]
