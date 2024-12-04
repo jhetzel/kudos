@@ -1,0 +1,11 @@
+psycopg2-binary==2.9.9
+
+# JSON-Validierung und Parsing
+jsonschema==4.19.0
+
+# Logging und Debugging
+loguru==0.7.0
+
+# Unit-Testing und Testabdeckung
+pytest==7.4.2
+pytest-cov==4.1.0
