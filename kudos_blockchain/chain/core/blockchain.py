@@ -1,21 +1,14 @@
-import sys
-from pathlib import Path
-
-# Projektverzeichnis zum PYTHONPATH hinzufügen
-project_root = Path(__file__).resolve().parent.parent.parent
-sys.path.append(str(project_root))
-
 import hashlib
 import json
 import logging
 import time
 from datetime import datetime
-from blockchain.core.block_service import BlockService
-from blockchain.core.block_validation_service import ValidationService
+from kudos_blockchain.chain.core.block_service import BlockService
+from kudos_blockchain.chain.core.block_validation_service import ValidationService
 
 
 class Block:
-    def __init__(self, index, timestamp, data, previous_hash, sender, thread, subject, message):
+    def __init__(self, index, timestamp, data, previous_hash, sender, thread, subject, message, transactions=None):
         self.index = index
         self.timestamp = (
             datetime.fromtimestamp(timestamp) if isinstance(timestamp, (int, float)) else timestamp
@@ -26,6 +19,7 @@ class Block:
         self.thread = thread
         self.subject = subject
         self.message = message
+        self.transactions = transactions or []
         self.hash = self.calculate_hash()
         self._frozen_state = self._to_dict()
 
@@ -33,19 +27,37 @@ class Block:
         """
         Converts the block to a dictionary format, excluding the hash if specified.
         """
-        block_dict = {key: value for key, value in self.__dict__.items() if not key.startswith("_")}
-        if not include_hash:
-            block_dict.pop("hash", None)
-        if isinstance(block_dict["timestamp"], datetime):
-            block_dict["timestamp"] = block_dict["timestamp"].isoformat()
+        block_dict = {
+            "index": self.index,
+            "timestamp": self.timestamp.isoformat() if isinstance(self.timestamp, datetime) else self.timestamp,
+            "data": self.data,
+            "transactions": self.data,  # Sicherstellen, dass `transactions` explizit enthalten sind
+            "previous_hash": self.previous_hash,
+            "sender": self.sender,
+            "thread": self.thread,
+            "subject": self.subject,
+            "message": self.message
+        }
+        if include_hash:
+            block_dict["hash"] = self.hash
+
+        logging.debug(f"Block-Daten im _to_dict: {block_dict}")
         return block_dict
 
     def calculate_hash(self):
         """
         Calculates the hash of the block based on its content.
         """
-        block_string = json.dumps(self._to_dict(include_hash=False), sort_keys=True)
-        return hashlib.sha256(block_string.encode()).hexdigest()
+        block_data = self._to_dict(include_hash=False)
+        logging.debug(f"Blockdaten vor der Serialisierung: {block_data}")
+
+        block_string = json.dumps(block_data, sort_keys=True)
+        logging.debug(f"Blockdaten nach der Serialisierung (JSON): {block_string}")
+
+        calculated_hash = hashlib.sha256(block_string.encode()).hexdigest()
+        logging.debug(f"Berechneter Hash: {calculated_hash}")
+
+        return calculated_hash
 
     def is_unchanged(self):
         """
@@ -62,7 +74,7 @@ class Blockchain:
             else BlockService(block_service_or_db_url)
         )
         self.chain = self._load_chain_from_db()
-        self.validation_service = ValidationService()
+        self.validation_service = ValidationService(self)
         self.mempool = []
 
         if not self.chain:
@@ -72,7 +84,7 @@ class Blockchain:
 
     def _load_chain_from_db(self):
         """
-        Loads the blockchain from the database.
+        Loads the chain from the database.
         """
         chain = self.block_service.load_chain()
         if not chain:
@@ -93,22 +105,25 @@ class Blockchain:
 
     def create_genesis_block(self):
         """
-        Creates the genesis block for the blockchain.
+        Erstellt den Genesis-Block.
         """
-        return Block(
-            index=0,
-            timestamp=time.time(),
-            data="Genesis Block",
-            previous_hash="0",
-            sender="system",
-            thread="none",
-            subject="Genesis Block",
-            message="This is the genesis block.",
-        )
+        genesis_data = {
+            "index": 0,
+            "timestamp": datetime.now().isoformat(),
+            "data": "Genesis Block",
+            "previous_hash": "0" * 64,
+            "sender": "system",
+            "thread": "genesis",
+            "subject": "Initial Block",
+            "message": "This is the genesis block.",
+        }
+        genesis_block = Block(**genesis_data)
+        genesis_block.hash = genesis_block.calculate_hash()
+        return genesis_block
 
     def add_block(self, data, sender, thread, subject, message):
         """
-        Adds a new block to the blockchain after validation.
+        Adds a new block to the chain after validation.
         """
         valid_transactions = self.validate_transactions(data)
         if not valid_transactions:
@@ -142,6 +157,24 @@ class Blockchain:
         """
         return self.chain[-1]
 
+    def get_latest_block_index(self):
+        """
+        Retrieves the index of the latest block in the chain.
+        :return: The index of the latest block, or -1 if the chain is empty.
+        """
+        if not self.chain:
+            return -1  # Keine Blöcke in der Blockchain
+        return self.chain[-1].index
+
+    def get_latest_block_hash(self):
+        """
+        Retrieves the hash of the latest block in the chain.
+        :return: The hash of the latest block, or None if the chain is empty.
+        """
+        if not self.chain:
+            return None  # Keine Blöcke in der Blockchain
+        return self.chain[-1].hash
+
     def submit_block_for_validation(self, data, sender, thread, subject, message):
         """
         Submits a block for validation and consensus voting.
@@ -162,9 +195,13 @@ class Blockchain:
         return new_block
 
     def finalize_block(self, block, votes):
+        """
+        Finalizes a block based on votes and adds it to the chain if approved.
+        """
         upvotes = votes.count(True)
         downvotes = votes.count(False)
         total_votes = upvotes + downvotes
+        logging.debug(f"Votes für Block {block.index}: Upvotes={upvotes}, Downvotes={downvotes}")
 
         if upvotes > downvotes:
             self.chain.append(block)

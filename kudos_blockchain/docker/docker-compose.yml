@@ -3,10 +3,10 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: kudos-blockchain
+    container_name: kudos_blockchain
     restart: always
     volumes:
-      - ../blockchain:/app/blockchain
+      - ../chain:/app/chain
     networks:
       - kudos-network
     ports:

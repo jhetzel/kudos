@@ -1,27 +1,17 @@
 import unittest
 from unittest.mock import patch
-from blockchain.core.blockchain import Blockchain
-from blockchain.core.block_service import BlockService
-
-class MockBlockService(BlockService):
-    """Mock für die BlockService-Klasse, um die Datenbank-Interaktionen zu simulieren."""
-    def __init__(self):
-        self.blocks = []
-
-    def load_chain(self):
-        return self.blocks
-
-    def save_block(self, block):
-        self.blocks.append(block.__dict__)
+from chain.core.blockchain import Blockchain
 
 class TestBlockchain(unittest.TestCase):
     def setUp(self):
-        self.mock_service = MockBlockService()  # Mock für BlockService
+        self.mock_service = MockBlockService()
         self.blockchain = Blockchain(self.mock_service)
 
-        # Genesis-Block sicherstellen
+        # Sicherstellen, dass der Genesis-Block korrekt erstellt und gespeichert wird
         if not self.blockchain.chain:
-            self.blockchain.chain.append(self.blockchain.create_genesis_block())
+            genesis_block = self.blockchain.create_genesis_block()
+            self.blockchain.chain.append(genesis_block)
+            self.blockchain.block_service.save_block(genesis_block)
 
     def test_add_block_with_valid_and_invalid_transactions(self):
         """Testet, ob nur gültige Transaktionen in den Block aufgenommen werden."""

@@ -1,7 +1,7 @@
 import time
 import logging
 import os
-from blockchain.core.blockchain import Blockchain
+from chain.core.blockchain import Blockchain
 
 
 def get_db_url():

@@ -1,4 +1,4 @@
-from blockchain.core.blockchain import Blockchain
+from chain.core.blockchain import Blockchain
 import os
 import logging
 

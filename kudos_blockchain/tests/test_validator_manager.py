@@ -1,7 +1,7 @@
 # tests/test_validator_manager.py
 
 import unittest
-from blockchain.core.validation_service.validator_manager import ValidatorManager
+from chain.core.validation_service.validator_manager import ValidatorManager
 
 class TestValidatorManager(unittest.TestCase):
     def setUp(self):

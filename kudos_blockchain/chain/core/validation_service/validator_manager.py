@@ -1,6 +1,6 @@
 class ValidatorManager:
     """
-    Manages validators in the Kudos blockchain network.
+    Manages validators in the Kudos chain network.
     """
 
     def __init__(self):
