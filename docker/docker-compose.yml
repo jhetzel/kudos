@@ -1,0 +1,37 @@
+services:
+  kudos-chain:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    container_name: kudos-chain
+    environment:
+      - DATABASE_URL=postgresql://kudos_user:kudos_pass@kudos-db:5432/kudos
+    depends_on:
+      - kudos-db
+    networks:
+      - kudos-network
+    volumes:
+      - ..:/app
+    ports:
+      - "8000:8000"
+
+  kudos-db:
+    image: postgres:latest
+    container_name: kudos-db
+    environment:
+      POSTGRES_USER: kudos_user
+      POSTGRES_PASSWORD: kudos_pass
+      POSTGRES_DB: kudos
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - kudos-network
+
+networks:
+  kudos-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

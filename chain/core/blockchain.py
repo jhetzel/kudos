@@ -3,8 +3,9 @@ import json
 import logging
 import time
 from datetime import datetime
-from kudos_blockchain.chain.core.block_service import BlockService
-from kudos_blockchain.chain.core.block_validation_service import ValidationService
+
+from chain.core.block_service import BlockService
+from chain.core.block_validation_service import ValidationService
 
 
 class Block:
@@ -91,7 +92,7 @@ class Blockchain:
             return []
         return [
             Block(
-                block["index"],
+                block["block_index"],
                 block["timestamp"],
                 block["data"],
                 block["previous_hash"],
@@ -105,7 +106,7 @@ class Blockchain:
 
     def create_genesis_block(self):
         """
-        Erstellt den Genesis-Block.
+        Erstellt und speichert den Genesis-Block, falls er nicht existiert.
         """
         genesis_data = {
             "index": 0,
@@ -115,10 +116,17 @@ class Blockchain:
             "sender": "system",
             "thread": "genesis",
             "subject": "Initial Block",
-            "message": "This is the genesis block.",
+            "message": "This is the genesis block."
         }
         genesis_block = Block(**genesis_data)
         genesis_block.hash = genesis_block.calculate_hash()
+
+        # Prüfen, ob der Genesis-Block in der DB existiert
+        if not self.chain:
+            logging.info("Genesis-Block wird erstellt.")
+            self.block_service.save_block(genesis_block)
+        else:
+            logging.info("Genesis-Block existiert bereits.")
         return genesis_block
 
     def add_block(self, data, sender, thread, subject, message):
@@ -206,10 +214,13 @@ class Blockchain:
         if upvotes > downvotes:
             self.chain.append(block)
             self.mempool.remove(block)
+
+            # Korrekte Logging-Nachricht
             logging.info(
                 f"200 OK - Block {block.index} wurde durch Konsens (Upvotes: {upvotes}/{total_votes}) zur Blockchain hinzugefügt."
             )
-            self.block_service.save_block(block)
+
+            self.block_service.save_block(block)  # Log aus `save_block` bleibt bestehen
             return True
         else:
             self.mempool.remove(block)
@@ -232,6 +243,10 @@ class Blockchain:
         """
         Validates transactions using the ValidationService.
         """
-        return [
-            tx for tx in transactions if self.validation_service.validate_transaction(tx)
-        ]
+        valid_transactions = []
+        for tx in transactions:
+            if self.validation_service.validate_transaction(tx):
+                valid_transactions.append(tx)
+            else:
+                logging.warning(f"400 Bad Request - Ungültige Transaktion: {tx}")
+        return valid_transactions

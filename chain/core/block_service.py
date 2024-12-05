@@ -1,24 +1,30 @@
-import sqlite3
 import psycopg2
 from psycopg2.extras import DictCursor
-from datetime import datetime
 import logging
 import json
+from prettytable import PrettyTable
+
+from logger_config import render_dynamic_table
 
 
 class BlockService:
     def __init__(self, db_url):
-        if "sqlite" in db_url:
-            # SQLite-Setup
-            self.connection = sqlite3.connect(":memory:")  # Für Tests
-            self.cursor = self.connection.cursor()
-            self._initialize_db()
-        else:
-            # PostgreSQL-Setup
+        """
+        Initialisiert die Verbindung zur PostgreSQL-Datenbank.
+        :param db_url: URL der Datenbank.
+        """
+        try:
             self.connection = psycopg2.connect(db_url, cursor_factory=DictCursor)
             self.cursor = self.connection.cursor()
+            self._initialize_db()
+        except Exception as e:
+            logging.error(f"500 Internal Server Error - Fehler bei der Verbindung zur Datenbank: {e}")
+            raise
 
     def _initialize_db(self):
+        """
+        Initialisiert die Datenbank und erstellt die Tabelle 'blocks', falls nicht vorhanden.
+        """
         create_table_query = """
         CREATE TABLE IF NOT EXISTS blocks (
             block_index SERIAL PRIMARY KEY,
@@ -44,47 +50,54 @@ class BlockService:
         """
         Speichert einen Block in der Datenbank.
         """
-        block_dict = block._to_dict(include_hash=True)  # Sicherstellen, dass der Hash enthalten ist
+        block_dict = block._to_dict(include_hash=True)
         self.cursor.execute(
             """
-            INSERT INTO blocks (block_index, timestamp, data, previous_hash, sender, thread, subject, message, hash)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO blocks (timestamp, data, previous_hash, sender, thread, subject, message, hash)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
-                block_dict["index"],
                 block_dict["timestamp"],
-                block_dict["data"],
+                json.dumps(block_dict["data"]),
                 block_dict["previous_hash"],
                 block_dict["sender"],
                 block_dict["thread"],
                 block_dict["subject"],
                 block_dict["message"],
-                block_dict["hash"]
+                block_dict["hash"],
             )
         )
         self.connection.commit()
-        logging.info(f"Block {block_dict['index']} erfolgreich gespeichert.")
+        logging.info(f"Block erfolgreich gespeichert: {block_dict['hash']}")
 
     def load_chain(self):
         """
-        Loads the entire chain from the database.
+        Lädt die gesamte Blockchain aus der PostgreSQL-Datenbank.
+        :return: Liste aller Blöcke.
         """
-        self.cursor.execute("SELECT * FROM blocks ORDER BY block_index ASC")
-        rows = self.cursor.fetchall()
-        return [
-            {
-                "block_index": row[1],
-                "timestamp": datetime.fromisoformat(row[2]) if row[2] else None,
-                "data": json.loads(row[3]) if row[3] else [],
-                "previous_hash": row[4],
-                "hash": row[5],
-                "sender": row[6],
-                "thread": row[7],
-                "subject": row[8],
-                "message": row[9],
-            }
-            for row in rows
-        ]
+        try:
+            self.cursor.execute("SELECT * FROM blocks ORDER BY block_index ASC")
+            rows = self.cursor.fetchall()
+            data = [
+    {
+        "block_index": row["block_index"],
+        "timestamp": row["timestamp"],
+        "data": row["data"],
+        "previous_hash": row["previous_hash"],
+        "hash": row["hash"],
+        "sender": row["sender"],
+        "thread": row["thread"],
+        "subject": row["subject"],
+        "message": row["message"],
+    }
+    for row in rows
+]
+            # Dynamische Tabelle rendern
+            render_dynamic_table(data)
+            return data
+        except Exception as e:
+            logging.error(f"500 Internal Server Error - Fehler beim Laden der Blockchain: {e}")
+            raise
 
 
 class TokenHandler:

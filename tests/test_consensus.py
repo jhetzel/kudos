@@ -7,7 +7,8 @@ import logging
 
 class TestProofOfKudos(unittest.TestCase):
     def setUp(self):
-        self.blockchain = Blockchain("sqlite:///:memory:")  # In-Memory-DB für Tests
+        db_url = "postgresql://kudos_user:kudos_pass@localhost:5432/kudos"
+        self.blockchain = Blockchain(db_url)  # In-Memory-DB für Tests
         self.pok = ProofOfKudos(self.blockchain)  # Blockchain übergeben
 
     def test_register_validator(self):

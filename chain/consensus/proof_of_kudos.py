@@ -1,6 +1,5 @@
-from typing import List, Dict
-import logging
-from kudos_blockchain.chain.core.block_validation_service import ValidationService
+from typing import Dict
+from chain.core.block_validation_service import ValidationService
 
 class ProofOfKudos:
     def __init__(self, blockchain):

@@ -1,11 +1,13 @@
 import unittest
 from unittest.mock import patch
+from datetime import datetime
 from chain.core.blockchain import Blockchain
+from chain.core.blockchain import Block
 
 class TestBlockchain(unittest.TestCase):
     def setUp(self):
-        self.mock_service = MockBlockService()
-        self.blockchain = Blockchain(self.mock_service)
+        db_url = "postgresql://kudos_user:kudos_pass@localhost:5432/kudos"
+        self.blockchain = Blockchain(db_url)
 
         # Sicherstellen, dass der Genesis-Block korrekt erstellt und gespeichert wird
         if not self.blockchain.chain:
@@ -44,26 +46,21 @@ class TestBlockchain(unittest.TestCase):
         # Prüfen, ob der ungültige Block abgelehnt wird
         self.assertFalse(self.blockchain.is_block_valid(invalid_block))
 
-    def test_finalize_block_with_pok_votes(self):
-        block = self.blockchain.submit_block_for_validation(
-            data=[{"amount": 10, "sender": "user1", "receiver": "user2"}],
-            sender="user1",
-            thread="thread1",
-            subject="subject1",
-            message="message1",
-        )
+    @patch('logging.info')
+    def test_finalize_block_with_pok_votes(self, mock_logging_info):
+        # Simuliere Votes
+        votes = [True] * 9 + [False] * 3
+        block = Block(6, datetime.now(), "data", "prev_hash", "sender", "thread", "subject", "message")
+        self.blockchain.mempool.append(block)
 
-        upvotes = 9
-        downvotes = 3
-        total_votes = upvotes + downvotes
+        result = self.blockchain.finalize_block(block, votes)
 
-        with patch("logging.info") as mock_logging_info:
-            result = self.blockchain.finalize_block(block, votes=[True] * upvotes + [False] * downvotes)
+        # Prüfen, ob der Block erfolgreich hinzugefügt wurde
+        self.assertTrue(result)
 
-            self.assertTrue(result)
-            mock_logging_info.assert_called_with(
-                f"200 OK - Block {block.index} wurde durch Konsens (Upvotes: {upvotes}/{total_votes}) zur Blockchain hinzugefügt."
-            )
+        # Prüfen, ob die Konsens-Nachricht korrekt geloggt wurde
+        mock_logging_info.assert_any_call(
+            '200 OK - Block 6 wurde durch Konsens (Upvotes: 9/12) zur Blockchain hinzugefügt.')
 
     def test_finalize_block_with_rejected_votes(self):
         """Testet, ob ein Block bei Ablehnung nicht zur Blockchain hinzugefügt wird."""
@@ -86,6 +83,8 @@ class TestBlockchain(unittest.TestCase):
         self.assertFalse(result)
         self.assertNotIn(block, self.blockchain.chain)
         self.assertNotIn(block, self.blockchain.mempool)
+
+
 
 if __name__ == "__main__":
     unittest.main()

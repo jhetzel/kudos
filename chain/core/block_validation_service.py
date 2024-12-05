@@ -1,6 +1,6 @@
 import logging
 import hashlib
-from kudos_blockchain.chain.core.validation_service.transaction_validator import TransactionValidator
+from chain.core.validation_service.transaction_validator import TransactionValidator
 
 
 class ValidationService:

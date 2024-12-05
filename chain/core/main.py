@@ -2,7 +2,8 @@ import time
 import logging
 import os
 from chain.core.blockchain import Blockchain
-
+from logger_config import setup_logging
+setup_logging()
 
 def get_db_url():
     """
