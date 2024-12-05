@@ -1,8 +1,8 @@
+import json
+import logging
+
 import psycopg2
 from psycopg2.extras import DictCursor
-import logging
-import json
-from prettytable import PrettyTable
 
 from logger_config import render_dynamic_table
 
