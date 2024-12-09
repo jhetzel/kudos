@@ -38,6 +38,15 @@ def log_service_status(blockchain):
         logging.error(f"500 Internal Server Error - Fehler beim Abrufen des Blockchain-Status: {e}")
 
 
+def log_block_count(blockchain):
+    """
+    Loggt die Anzahl der Blöcke in der Blockchain.
+
+    :param blockchain: Die Blockchain-Instanz, die die Kette enthält.
+    """
+    block_count = len(blockchain.chain)
+    logging.info(f"200 OK - Die Blockchain enthält aktuell {block_count} Blöcke.")
+
 def main():
     """
     Startet den Blockchain-Service.
@@ -53,7 +62,7 @@ def main():
 
     try:
         while True:
-            log_service_status(blockchain)
+            log_block_count(blockchain)
             time.sleep(10)  # Statusmeldung alle 10 Sekunden
     except KeyboardInterrupt:
         logging.warning("503 Service Unavailable - Blockchain-Service wurde manuell beendet.")

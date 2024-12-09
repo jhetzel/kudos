@@ -62,7 +62,8 @@ setup_logging()
 # Dynamische Daten
 data_dict = []
 
-data_list = []
+data_list = [
+]
 
 # Beispiele
 render_dynamic_table(data_dict)  # Daten als Liste von Dictionaries

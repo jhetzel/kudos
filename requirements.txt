@@ -1,5 +1,5 @@
 psycopg2-binary==2.9.9
-colorlog
+colorlog~=6.9.0
 # JSON-Validierung und Parsing
 jsonschema==4.19.0
 
@@ -9,3 +9,6 @@ loguru==0.7.0
 # Unit-Testing und Testabdeckung
 pytest==7.4.2
 pytest-cov==4.1.0
+
+psycopg2~=2.9.10
+prettytable~=3.12.0
