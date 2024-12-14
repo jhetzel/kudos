@@ -84,3 +84,7 @@ class Blockchain:
 
         print(f"Upvotes: {upvotes}, Downvotes: {downvotes}")
         return upvotes > downvotes
+
+    @classmethod
+    def from_json(cls, param):
+        pass

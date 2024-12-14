@@ -1,7 +1,6 @@
-import json
-
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, json
 from kudos_blockchain import Blockchain, Transaktion
+
 
 app = Flask(__name__)
 kudos_chain = Blockchain()
